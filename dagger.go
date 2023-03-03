@@ -9,7 +9,12 @@ import (
 )
 
 func main() {
-	if err := build(context.Background()); err != nil {
+	err := build(context.Background())
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	if err := container(context.Background()); err != nil {
 		fmt.Println(err)
 	}
 }
@@ -41,11 +46,7 @@ func build(ctx context.Context) error {
 		for _, goarch := range arches {
 			// create a directory for each os and arch
 			path := fmt.Sprintf("build/%s/%s/", goos, goarch)
-			dir, err := golang.Workdir(ctx)
-			if err != nil {
-				return err
-			}
-			fmt.Println(dir)
+
 			// set GOARCH and GOOS in the build environment
 			build := golang.WithEnvVariable("GOOS", goos)
 			build = build.WithEnvVariable("GOARCH", goarch)
@@ -63,7 +64,25 @@ func build(ctx context.Context) error {
 		return err
 	}
 
+	return nil
+}
+
+func container(ctx context.Context) error {
+	client, err := dagger.Connect(ctx, dagger.WithLogOutput(os.Stdout), dagger.WithWorkdir("."))
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
 	defer client.Close()
+	src := client.Host().Directory("build")
+	contents := client.Container().
+		From("alpine:latest").
+		WithMountedDirectory("/src", src).
+		WithEntrypoint([]string{"/src/linux/amd64/src"})
+
+	contents.Build(src)
+	contents.Export(ctx, "build/alpine.tar")
 
 	return nil
 }
