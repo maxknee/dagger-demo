@@ -1,3 +1,3 @@
 POC using dagger.io
 
-`go run dagger.io`
+`go run dagger.go`
